@@ -1,0 +1,8 @@
+product_code,product_name,product_class
+CC,Kartu Kredit,Unsecured
+KTA,Kredit Tanpa Agunan,Unsecured
+KPR,Kredit Pemilikan Rumah,Secured
+KKB,Kredit Kendaraan Bermotor,Secured
+BNPL,Buy Now Pay Later,Unsecured
+FINTECH,Pinjaman Fintech P2P,Unsecured
+MODAL,Kredit Modal Kerja,Secured

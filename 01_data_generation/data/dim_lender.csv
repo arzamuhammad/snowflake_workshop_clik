@@ -1,0 +1,13 @@
+lender_code,lender_name,lender_type
+BNK001,Bank Mandiri,Bank
+BNK002,Bank BCA,Bank
+BNK003,Bank BRI,Bank
+BNK004,Bank BNI,Bank
+BNK005,Bank CIMB Niaga,Bank
+BNK006,Bank Danamon,Bank
+FIN001,Kredivo,Fintech
+FIN002,Akulaku,Fintech
+FIN003,Home Credit,Multifinance
+FIN004,Adira Finance,Multifinance
+FIN005,AwanTunai,Fintech
+FIN006,Investree,Fintech

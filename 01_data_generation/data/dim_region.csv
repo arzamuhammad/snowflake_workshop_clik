@@ -1,0 +1,19 @@
+region_code,region_name,island_group
+DKI,DKI Jakarta,Jawa
+JABAR,Jawa Barat,Jawa
+JATENG,Jawa Tengah,Jawa
+JATIM,Jawa Timur,Jawa
+BANTEN,Banten,Jawa
+YOGYA,DI Yogyakarta,Jawa
+BALI,Bali,Bali-Nusra
+NTB,Nusa Tenggara Barat,Bali-Nusra
+SUMUT,Sumatera Utara,Sumatera
+SUMSEL,Sumatera Selatan,Sumatera
+RIAU,Riau,Sumatera
+LAMPUNG,Lampung,Sumatera
+KALTIM,Kalimantan Timur,Kalimantan
+KALBAR,Kalimantan Barat,Kalimantan
+SULSEL,Sulawesi Selatan,Sulawesi
+SULUT,Sulawesi Utara,Sulawesi
+PAPUA,Papua,Indonesia Timur
+MALUKU,Maluku,Indonesia Timur
