@@ -5,8 +5,8 @@
    POLA: COPY FILES dari workspace -> internal stage -> COPY INTO table.
    (Tidak perlu SECRET / API INTEGRATION / GIT REPOSITORY object.)
 
-   Nama workspace default = "workshop_clik". Path file CSV di dalam repo =
-   workshop_clik/01_data_generation/data/*.csv
+   Nama workspace default = "snowflake_workshop_clik" (sama dgn nama repo).
+   Path file CSV di dalam repo = 01_data_generation/data/*.csv (root repo).
    ============================================================================ */
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE GEN2_SMALL;
@@ -15,12 +15,12 @@ USE SCHEMA PUBLIC;
 
 -- 1) Copy CSV dari GIT WORKSPACE (versions/live) ke internal stage
 COPY FILES INTO @RAW_DATA_STAGE/
-FROM 'snow://workspace/USER$.PUBLIC."workshop_clik"/versions/live/'
+FROM 'snow://workspace/USER$.PUBLIC."snowflake_workshop_clik"/versions/live/'
 FILES=(
-  'workshop_clik/01_data_generation/data/dim_region.csv',
-  'workshop_clik/01_data_generation/data/dim_product.csv',
-  'workshop_clik/01_data_generation/data/dim_lender.csv',
-  'workshop_clik/01_data_generation/data/loan_applications.csv'
+  '01_data_generation/data/dim_region.csv',
+  '01_data_generation/data/dim_product.csv',
+  '01_data_generation/data/dim_lender.csv',
+  '01_data_generation/data/loan_applications.csv'
 );
 
 LS @RAW_DATA_STAGE/;

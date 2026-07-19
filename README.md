@@ -47,7 +47,7 @@ All workshop code (SQL, notebook, Streamlit, agent files) lives in a **public** 
      - **Allowed domain / prefix:** `github.com`
      - Click **Create**
    - **Public repository:** leave credentials **empty** (the repo is public — no PAT/secret required)
-   - **Workspace name:** `workshop_clik` (or your preferred name)
+   - **Workspace name:** `snowflake_workshop_clik` (defaults to the repo name; keep it to match the load script)
 4. Click **Create** and wait for the workspace to sync with the repo.
 5. In the workspace file explorer you now see the full repo (`00_setup/`, `02_data_load/`, `03_ml_notebook/`, …). Open any `.sql` file and run it right here, or open the notebook under `03_ml_notebook/`.
 
@@ -75,11 +75,11 @@ This builds `SUBJECT_FEATURES` — **1,000,000 rows × ~196 features** — entir
 This is the recommended teaching flow (mirrors the flood-resilience HOL). It assumes you already created the **Git Workspace** in Step 0.0, so all repo files are already fetched into the workspace.
 
 1. Run **`02_data_load/03_load_from_git.sql`** (no edits needed). It will:
-   - `COPY FILES` from the workspace path `snow://workspace/USER$.PUBLIC."workshop_clik"/versions/live/` into `RAW_DATA_STAGE`
+   - `COPY FILES` from the workspace path `snow://workspace/USER$.PUBLIC."snowflake_workshop_clik"/versions/live/` into `RAW_DATA_STAGE` (CSVs live at `01_data_generation/data/`)
    - `COPY INTO` the four tables
    - No `SECRET`, `API INTEGRATION`, or `GIT REPOSITORY` object is needed — the workspace already has the files.
 
-> If your workspace name differs from `workshop_clik`, edit the `snow://workspace/...` path in the script accordingly.
+> If your workspace name differs from `snowflake_workshop_clik`, edit the `snow://workspace/...` path in the script accordingly. Tip: run `LS 'snow://workspace/USER$.PUBLIC."snowflake_workshop_clik"/versions/live/';` to confirm the exact file paths.
 
 **Alternative (no Workspace):** use `PUT file://... @RAW_DATA_STAGE` then `COPY INTO`.
 
