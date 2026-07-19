@@ -93,7 +93,36 @@ SELECT COUNT(*) FROM LOAN_APPLICATIONS;   -- 50,000
 
 # Module 1 — End-to-End Machine Learning (120 min)
 
-Open **`03_ml_notebook/01_end_to_end_ml_pd.ipynb`** in **Snowflake Notebooks (Container Runtime)**.
+The ML notebook runs on **Container Runtime**, which needs a **compute pool** and a notebook **runtime service**. Set these up first, then open the notebook from your Git Workspace.
+
+### Step 1.0 — Create a compute pool & run the notebook on a container service
+
+**a) Create the compute pool** (run once in a worksheet or SQL cell):
+```sql
+USE ROLE ACCOUNTADMIN;
+CREATE COMPUTE POOL IF NOT EXISTS CLIK_NOTEBOOK_POOL
+  MIN_NODES = 1
+  MAX_NODES = 1
+  INSTANCE_FAMILY = CPU_X64_M      -- use a GPU family (e.g. GPU_NV_S) only if training on GPU
+  AUTO_RESUME = TRUE
+  AUTO_SUSPEND_SECS = 3600;
+
+-- privileges so the notebook can run on the pool and reach the internet for pip installs
+GRANT USAGE ON COMPUTE POOL CLIK_NOTEBOOK_POOL TO ROLE ACCOUNTADMIN;
+```
+
+**b) Open the notebook from the Git Workspace**
+1. In your workspace (Step 0.0), open **`03_ml_notebook/01_end_to_end_ml_pd.ipynb`**.
+2. When prompted to select a runtime, choose **Run on container** and pick:
+   - **Compute pool:** `CLIK_NOTEBOOK_POOL`
+   - **Runtime:** a Container Runtime for ML image (default is fine)
+   - **Query warehouse:** `GEN2_SMALL`
+3. Click **Create / Connect** and wait ~1–3 minutes for the notebook service to become **Active**.
+4. Set the notebook context — **Database** `CLIK_WORKSHOP2`, **Schema** `PUBLIC`.
+
+> **Why a compute pool?** Container Runtime notebooks execute on Snowpark Container Services (SPCS), not on a virtual warehouse. The warehouse is used only for SQL pushdown/queries. If you don't have `CREATE COMPUTE POOL`, ask an `ACCOUNTADMIN` to create the pool and grant `USAGE` on it to your role.
+
+> **Cleanup:** `DROP COMPUTE POOL CLIK_NOTEBOOK_POOL;` (or let `AUTO_SUSPEND` idle it) when the workshop ends.
 
 ### Step 1.1 — Setup & load data
 Cells 1–2: connect the Snowpark session, inspect `SUBJECT_FEATURES`, and pull a sample into pandas.
