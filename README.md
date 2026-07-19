@@ -53,8 +53,8 @@ All workshop code (SQL, notebook, Streamlit, agent files) lives in a **public** 
 
 > **Tip:** With a Git Workspace, all CSVs, the notebook, and the Streamlit app are available inside Snowflake — no manual file uploads needed. To pull the latest changes later, click the **branch/sync** control in the workspace toolbar.
 
-**Option B — Git Repository object (SQL only, no Workspace):**
-If you prefer pure SQL (e.g. running everything from a worksheet), skip the Workspace and use the Git Repository object created in **Step 0.4** below (`03_load_from_git.sql`). Because the repo is public, that script does **not** create a `SECRET` — it just creates an `API INTEGRATION`, a `GIT REPOSITORY`, then `FETCH` + `COPY FILES`.
+**After the workspace is ready:**
+Open a worksheet (or a SQL cell in the workspace) and run the setup scripts in order (Steps 0.1–0.4). The data-load script **`02_data_load/03_load_from_git.sql`** reads the CSVs straight from the workspace via `COPY FILES INTO ... FROM 'snow://workspace/...'` — no `SECRET` or `GIT REPOSITORY` object required because the workspace already holds every file.
 
 ### Step 0.1 — Create database, stages, file format
 Run **`00_setup/00_setup.sql`** in a Snowsight worksheet. This creates:
@@ -71,18 +71,17 @@ This builds `SUBJECT_FEATURES` — **1,000,000 rows × ~196 features** — entir
 
 > **Why a script instead of a CSV?** A 1M × 200 CSV would be gigabytes. Generating in-database is faster and teaches `GENERATOR`/`RANDOM` patterns. The small dimension/application CSVs are used to teach the file-loading flow below.
 
-### Step 0.4 — Load CSVs via Git → Stage → Table
-This is the recommended teaching flow (mirrors the flood-resilience HOL). Since the repo is **public**, no secret/PAT is required.
+### Step 0.4 — Load CSVs from the Git Workspace → Stage → Table
+This is the recommended teaching flow (mirrors the flood-resilience HOL). It assumes you already created the **Git Workspace** in Step 0.0, so all repo files are already fetched into the workspace.
 
-1. Run **`02_data_load/03_load_from_git.sql`** (no edits needed for a public repo). It will:
-   - Create an `API INTEGRATION` and a `GIT REPOSITORY` object (no `SECRET`)
-   - `ALTER GIT REPOSITORY ... FETCH`
-   - `COPY FILES` from the git repo into `RAW_DATA_STAGE`
+1. Run **`02_data_load/03_load_from_git.sql`** (no edits needed). It will:
+   - `COPY FILES` from the workspace path `snow://workspace/USER$.PUBLIC."workshop_clik"/versions/live/` into `RAW_DATA_STAGE`
    - `COPY INTO` the four tables
+   - No `SECRET`, `API INTEGRATION`, or `GIT REPOSITORY` object is needed — the workspace already has the files.
 
-> If you already created the **Git Workspace** in Step 0.0, you can instead `COPY FILES` directly from the workspace path (`snow://workspace/...`) — but the standalone Git Repository object in this script keeps the SQL self-contained.
+> If your workspace name differs from `workshop_clik`, edit the `snow://workspace/...` path in the script accordingly.
 
-**Alternative (no Git):** use `PUT file://... @RAW_DATA_STAGE` then `COPY INTO`.
+**Alternative (no Workspace):** use `PUT file://... @RAW_DATA_STAGE` then `COPY INTO`.
 
 **Validation:**
 ```sql
