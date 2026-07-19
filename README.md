@@ -4,7 +4,7 @@
 **Duration:** 10:00 – 15:00 (5 hours)
 **Use Case:** Credit Default Prediction (Probability of Default)
 **Environment:** `CLIK_WORKSHOP2.PUBLIC` · Warehouse `GEN2_SMALL`
-**Repo:** https://github.com/arzamuhammad/snowflake_workshop_clik (private)
+**Repo:** https://github.com/arzamuhammad/snowflake_workshop_clik (public)
 
 ---
 
@@ -23,15 +23,38 @@
 
 ## Prerequisites
 
-- Snowflake account with `ACCOUNTADMIN` (or role able to `CREATE DATABASE`, `CREATE COMPUTE POOL`, `BIND SERVICE ENDPOINT`)
+- Snowflake account with `ACCOUNTADMIN` (or role able to `CREATE DATABASE`, `CREATE COMPUTE POOL`, `BIND SERVICE ENDPOINT`, `CREATE INTEGRATION`)
 - Warehouse size `SMALL` or larger
 - `snowflake-ml-python >= 1.25.0` (available in Notebooks Container Runtime)
-- A GitHub account + Personal Access Token (PAT) — for the Git → Stage → Table module
-- A Snowflake PAT — for calling the real-time REST endpoint
+- A web browser (Chrome recommended) — the workshop repo is **public**, so no GitHub account or PAT is needed to pull it
+- A Snowflake PAT — for calling the real-time REST endpoint (Module 1b only)
 
 ---
 
 # Module 0 — Setup & Data (30 min)
+
+### Step 0.0 — Create a Git Workspace from the public repo
+
+All workshop code (SQL, notebook, Streamlit, agent files) lives in a **public** GitHub repo. The easiest way to bring everything into Snowflake is a **Git Workspace** — it clones the repo directly into Snowsight so you can open the notebook and `COPY FILES` from it without any manual upload.
+
+**Option A — Git Workspace (recommended, UI):**
+1. In Snowsight, click **Projects** in the left sidebar → **Workspaces**.
+2. Click the **+** button (top right) → **Git Repository**.
+3. In the dialog:
+   - **Repository URL:** `https://github.com/arzamuhammad/snowflake_workshop_clik.git`
+   - **API Integration:** click **+ Create a new API integration**
+     - **Integration name:** `CLIK_GIT_API` (must be UPPER CASE)
+     - **Allowed domain / prefix:** `github.com`
+     - Click **Create**
+   - **Public repository:** leave credentials **empty** (the repo is public — no PAT/secret required)
+   - **Workspace name:** `workshop_clik` (or your preferred name)
+4. Click **Create** and wait for the workspace to sync with the repo.
+5. In the workspace file explorer you now see the full repo (`00_setup/`, `02_data_load/`, `03_ml_notebook/`, …). Open any `.sql` file and run it right here, or open the notebook under `03_ml_notebook/`.
+
+> **Tip:** With a Git Workspace, all CSVs, the notebook, and the Streamlit app are available inside Snowflake — no manual file uploads needed. To pull the latest changes later, click the **branch/sync** control in the workspace toolbar.
+
+**Option B — Git Repository object (SQL only, no Workspace):**
+If you prefer pure SQL (e.g. running everything from a worksheet), skip the Workspace and use the Git Repository object created in **Step 0.4** below (`03_load_from_git.sql`). Because the repo is public, that script does **not** create a `SECRET` — it just creates an `API INTEGRATION`, a `GIT REPOSITORY`, then `FETCH` + `COPY FILES`.
 
 ### Step 0.1 — Create database, stages, file format
 Run **`00_setup/00_setup.sql`** in a Snowsight worksheet. This creates:
@@ -49,14 +72,15 @@ This builds `SUBJECT_FEATURES` — **1,000,000 rows × ~196 features** — entir
 > **Why a script instead of a CSV?** A 1M × 200 CSV would be gigabytes. Generating in-database is faster and teaches `GENERATOR`/`RANDOM` patterns. The small dimension/application CSVs are used to teach the file-loading flow below.
 
 ### Step 0.4 — Load CSVs via Git → Stage → Table
-This is the recommended teaching flow (mirrors the flood-resilience HOL).
+This is the recommended teaching flow (mirrors the flood-resilience HOL). Since the repo is **public**, no secret/PAT is required.
 
-1. Edit **`02_data_load/03_load_from_git.sql`** and replace `<GITHUB_USER>` and `<GITHUB_PAT>`.
-2. Run it. It will:
-   - Create a `SECRET` (PAT), `API INTEGRATION`, and `GIT REPOSITORY` object
+1. Run **`02_data_load/03_load_from_git.sql`** (no edits needed for a public repo). It will:
+   - Create an `API INTEGRATION` and a `GIT REPOSITORY` object (no `SECRET`)
    - `ALTER GIT REPOSITORY ... FETCH`
    - `COPY FILES` from the git repo into `RAW_DATA_STAGE`
    - `COPY INTO` the four tables
+
+> If you already created the **Git Workspace** in Step 0.0, you can instead `COPY FILES` directly from the workspace path (`snow://workspace/...`) — but the standalone Git Repository object in this script keeps the SQL self-contained.
 
 **Alternative (no Git):** use `PUT file://... @RAW_DATA_STAGE` then `COPY INTO`.
 

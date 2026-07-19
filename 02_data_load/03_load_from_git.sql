@@ -1,47 +1,39 @@
 /* ============================================================================
    CLIK WORKSHOP 2 — 03_load_from_git.sql
    POLA YANG DIAJARKAN: Git Repository -> COPY FILES ke stage -> COPY INTO table
-   Ganti <GITHUB_USER> dan <GITHUB_PAT> sesuai environment Anda.
+   Repo bersifat PUBLIC, jadi TIDAK perlu SECRET / GitHub PAT.
    ============================================================================ */
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE GEN2_SMALL;
 USE DATABASE CLIK_WORKSHOP2;
 USE SCHEMA PUBLIC;
 
--- 1) Secret untuk GitHub PAT (skip jika repo public)
-CREATE OR REPLACE SECRET GITHUB_CLIK_SECRET
-  TYPE = PASSWORD
-  USERNAME = '<GITHUB_USER>'
-  PASSWORD = '<GITHUB_PAT>';
-
--- 2) API integration
-CREATE OR REPLACE API INTEGRATION GITHUB_CLIK_API
+-- 1) API integration (public repo -> tanpa ALLOWED_AUTHENTICATION_SECRETS)
+CREATE OR REPLACE API INTEGRATION CLIK_GIT_API
   API_PROVIDER = GIT_HTTPS_API
-  API_ALLOWED_PREFIXES = ('https://github.com/<GITHUB_USER>')
-  ALLOWED_AUTHENTICATION_SECRETS = (GITHUB_CLIK_SECRET)
+  API_ALLOWED_PREFIXES = ('https://github.com/arzamuhammad')
   ENABLED = TRUE;
 
--- 3) Git Repository object
+-- 2) Git Repository object (public -> tanpa GIT_CREDENTIALS)
 CREATE OR REPLACE GIT REPOSITORY CLIK_WORKSHOP_REPO
-  API_INTEGRATION = GITHUB_CLIK_API
-  GIT_CREDENTIALS = GITHUB_CLIK_SECRET
-  ORIGIN = 'https://github.com/<GITHUB_USER>/snowflake_workshop_clik.git';
+  API_INTEGRATION = CLIK_GIT_API
+  ORIGIN = 'https://github.com/arzamuhammad/snowflake_workshop_clik.git';
 
--- 4) Fetch
+-- 3) Fetch
 ALTER GIT REPOSITORY CLIK_WORKSHOP_REPO FETCH;
 LS @CLIK_WORKSHOP_REPO/branches/main/workshop_clik/01_data_generation/data/;
 
--- 5) Copy files dari git repo ke internal stage
+-- 4) Copy files dari git repo ke internal stage
 COPY FILES INTO @RAW_DATA_STAGE/
   FROM @CLIK_WORKSHOP_REPO/branches/main/workshop_clik/01_data_generation/data/;
 
--- 6) COPY INTO tables
+-- 5) COPY INTO tables
 COPY INTO DIM_REGION FROM @RAW_DATA_STAGE/dim_region.csv FILE_FORMAT=(FORMAT_NAME=CSV_FF) FORCE=TRUE;
 COPY INTO DIM_PRODUCT FROM @RAW_DATA_STAGE/dim_product.csv FILE_FORMAT=(FORMAT_NAME=CSV_FF) FORCE=TRUE;
 COPY INTO DIM_LENDER FROM @RAW_DATA_STAGE/dim_lender.csv FILE_FORMAT=(FORMAT_NAME=CSV_FF) FORCE=TRUE;
 COPY INTO LOAN_APPLICATIONS FROM @RAW_DATA_STAGE/loan_applications.csv FILE_FORMAT=(FORMAT_NAME=CSV_FF) FORCE=TRUE;
 
--- 7) Validasi
+-- 6) Validasi
 SELECT 'DIM_REGION' t, COUNT(*) n FROM DIM_REGION
 UNION ALL SELECT 'DIM_PRODUCT', COUNT(*) FROM DIM_PRODUCT
 UNION ALL SELECT 'DIM_LENDER', COUNT(*) FROM DIM_LENDER
