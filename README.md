@@ -119,9 +119,9 @@ GRANT USAGE ON COMPUTE POOL CLIK_NOTEBOOK_POOL TO ROLE ACCOUNTADMIN;
    - **Query warehouse:** `GEN2_SMALL`
 3. Click **Create / Connect** and wait ~1–3 minutes for the notebook service to become **Active**.
 4. Set the notebook context — **Database** `CLIK_WORKSHOP2`, **Schema** `PUBLIC`.
-5. Run the **first code cell** — it does `!pip install -q --upgrade snowflake-ml-python`.
+5. Run the **first code cell** — it prints the installed `snowflake-ml-python` version and only `!pip install --upgrade` it if it's below `1.25.0`.
 
-> **Packages on Container Runtime:** the base image already includes `snowflake-ml-python`, `snowpark`, `scikit-learn`, `xgboost`, `lightgbm`, `pandas`, `numpy`, `matplotlib`, so the core training cells need no install. Extra/upgraded packages are installed with **`!pip install`** in a cell (Workspace container notebooks have PyPI access by default) — **not** via the Anaconda "Packages" dropdown, which only applies to Warehouse-runtime notebooks. We upgrade `snowflake-ml-python` because **Module 1b (real-time SPCS serving) requires `>= 1.25.0`**; if the version printed is still older, restart the session and re-run.
+> **Packages on Container Runtime:** the base image already includes `snowflake-ml-python`, `snowpark`, `scikit-learn`, `xgboost`, `lightgbm`, `pandas`, `numpy`, `matplotlib`, so the training cells need no install. Extra/upgraded packages are installed with **`!pip install`** in a cell (Snowflake serves them from an internal PyPI mirror — no external access needed) — **not** via the Anaconda "Packages" dropdown, which only applies to Warehouse-runtime notebooks. We only upgrade `snowflake-ml-python` when the printed version is below `1.25.0` (required by **Module 1b real-time SPCS serving**); if it upgrades, restart the session and re-run.
 
 > **Why a compute pool?** Container Runtime notebooks execute on Snowpark Container Services (SPCS), not on a virtual warehouse. The warehouse is used only for SQL pushdown/queries. If you don't have `CREATE COMPUTE POOL`, ask an `ACCOUNTADMIN` to create the pool and grant `USAGE` on it to your role.
 
