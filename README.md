@@ -218,14 +218,20 @@ python 04b_call_realtime.py SUBJ000000020 SUBJ000000044
 - Output shape is `{"data": [[<idx>, {..., "PREDICT_PROBA_1": <PD>}]]}`.
 - Auth/URL failures return **HTTP 404** by design.
 
-### Step 1b.5 — Call the REST API from INSIDE a Snowflake Notebook (showcase)
-To call the endpoint from a notebook, the container needs an **External Access Integration**.
-1. Run **`04_model_deployment/04b_notebook_rest_setup.sql`** (edit the host + PAT): creates `NETWORK RULE CLIK_SPCS_EGRESS`, `SECRET CLIK_PD_PAT`, and `EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI`.
-2. Open **`04_model_deployment/04b_realtime_hybrid_rest.ipynb`** in Snowsight.
-3. Attach the EAI: notebook `⋯` → **Notebook settings** → **External access integrations** → enable `CLIK_SPCS_EAI` → restart.
-4. Run the cells: **Hybrid Table point lookup → REST call (`requests`) → decision**. The PAT is read from the secret via `_snowflake.get_generic_secret_string("CLIK_PD_PAT")` — never hardcoded.
+### Step 1b.5 — Call the REST API from INSIDE a Snowflake Notebook (HOL showcase)
+To call the endpoint from a notebook, the container needs an **External Access Integration** (egress). For a HOL, each participant pastes **their own PAT** — no shared secret required.
 
-> No-PAT alternative: **`04b_call_realtime_notebook.py`** calls the model with the internal SQL service function `CLIK_PD_SERVICE!PREDICT_PROBA(...)` (no External Access Integration needed).
+1. Run **`04_model_deployment/04b_notebook_rest_setup.sql`** (edit the ingress host): creates `NETWORK RULE CLIK_SPCS_EGRESS` and `EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI` (network rule only, no secret).
+2. Open one of the showcase notebooks in Snowsight:
+   - **`04_model_deployment/04b_realtime_hybrid_rest.ipynb`** — feature lookup via **Hybrid Table point lookup** (`SUBJECT_FEATURES_ENCODED_HT`).
+   - **`04_model_deployment/04b_realtime_view_rest.ipynb`** — feature lookup via **View/standard table** (`SUBJECT_FEATURES_ENCODED`) for comparison.
+3. Attach the EAI: notebook `⋯` → **Notebook settings** → **External access integrations** → enable `CLIK_SPCS_EAI` → restart.
+4. In **Cell 1**, set `PAT_TOKEN = "<your PAT>"` (Snowsight → profile → Settings → Authentication → Programmatic access tokens → Generate).
+5. Run the cells: **feature lookup → REST call (`requests`) → decision**.
+
+> **Security (HOL):** since the PAT is typed directly in Cell 1, remind participants **not to commit** a notebook containing their PAT (or clear it after the demo).
+
+> **No-PAT alternative:** **`04b_call_realtime_notebook.py`** calls the model with the internal SQL service function `CLIK_PD_SERVICE!PREDICT_PROBA(...)` — no External Access Integration or PAT needed.
 
 ---
 
