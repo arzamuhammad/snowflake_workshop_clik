@@ -4,7 +4,8 @@
    https://docs.snowflake.com/en/developer-guide/snowflake-ml/inference/real-time-inference-rest-api
    ----------------------------------------------------------------------------
    Prasyarat:
-   - Model CLIK_PD_MODEL v1 sudah di Model Registry (dari Modul 03)
+   - Model CLIK_PD_MODEL sudah di Model Registry (default version = V2_SNOWPARK_ML)
+   - View SUBJECT_FEATURES_ENCODED sudah ada (lihat 04a_batch_scoring.sql)
    - snowflake-ml-python >= 1.25.0 (GA untuk real-time REST API)
    ============================================================================ */
 USE ROLE ACCOUNTADMIN;
@@ -39,5 +40,11 @@ SHOW SERVICES IN SCHEMA CLIK_WORKSHOP2.PUBLIC;
 -- 6) (Opsional) izinkan role lain memanggil endpoint
 -- GRANT SERVICE ROLE CLIK_PD_SERVICE!ALL_ENDPOINTS_USAGE TO ROLE <role>;
 
--- 7) (Opsional) panggil via SQL service function (internal)
--- SELECT CLIK_PD_SERVICE!PREDICT_PROBA(*) FROM SUBJECT_FEATURES LIMIT 10;
+-- 7) (Opsional) panggil via SQL service function (internal, tanpa PAT).
+--    Gunakan view ter-encode (60 fitur) - BUKAN tabel mentah, karena model
+--    dilatih dengan One-Hot Encoding. Output OBJECT -> key PREDICT_PROBA_1 = PD.
+-- SELECT
+--   SUBJECT_ID,
+--   CLIK_PD_SERVICE!PREDICT_PROBA(* EXCLUDE (SUBJECT_ID)):"PREDICT_PROBA_1"::FLOAT AS pd
+-- FROM SUBJECT_FEATURES_ENCODED
+-- LIMIT 10;

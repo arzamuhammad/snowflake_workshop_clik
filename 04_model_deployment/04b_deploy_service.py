@@ -5,7 +5,7 @@ Jalankan di Snowflake Notebook (Container Runtime) ATAU lokal dengan snowflake-m
 Sesuai: https://docs.snowflake.com/en/developer-guide/snowflake-ml/inference/real-time-inference-rest-api
 
 Prasyarat:
-- Model CLIK_PD_MODEL v1 sudah di Model Registry
+- Model CLIK_PD_MODEL sudah di Model Registry (default version = V2_SNOWPARK_ML)
 - Compute pool CLIK_SCORING_POOL sudah ada (lihat 04b_realtime_spcs.sql)
 - snowflake-ml-python >= 1.25.0
 """
@@ -15,8 +15,8 @@ from snowflake.ml.registry import Registry
 session = get_active_session()
 reg = Registry(session=session, database_name="CLIK_WORKSHOP2", schema_name="PUBLIC")
 
-# Ambil model version object
-mv = reg.get_model("CLIK_PD_MODEL").version("V1")
+# Ambil model version object (pakai versi default: V2_SNOWPARK_ML).
+mv = reg.get_model("CLIK_PD_MODEL").default
 
 # Deploy sebagai managed service di SPCS.
 # gpu_requests=None -> WAJIB untuk model sklearn/xgboost/lightgbm (CPU).
@@ -26,15 +26,12 @@ mv.create_service(
     ingress_enabled=True,          # WAJIB True untuk memanggil dari luar Snowflake
     gpu_requests=None,             # CPU model
     max_instances=2,               # autoscaling horizontal
-    # num_workers=2,               # override jika perlu (default: 2*nCPU+1 utk CPU)
-    # image_build_compute_pool=... # opsional: pool lebih kecil utk build image
 )
 print("Service creation dimulai. CPU model butuh ~5-10 menit sampai READY.")
 
 # Ambil endpoint publik (ingress) & internal
 services = mv.list_services()
 print(services)
-# inference_endpoint = public URL, internal_endpoint = internal DNS
 
 # Cara lain via SQL:
 #   SHOW ENDPOINTS IN SERVICE CLIK_PD_SERVICE;   -> kolom ingress_url
