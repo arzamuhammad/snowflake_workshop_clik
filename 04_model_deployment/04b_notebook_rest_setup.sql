@@ -28,11 +28,15 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI
   ALLOWED_AUTHENTICATION_SECRETS = (CLIK_PD_PAT)
   ENABLED = TRUE;
 
--- 4) Attach EAI ke Notebook:
---    Snowsight Notebook -> "..." -> Notebook settings -> External access
---    integrations -> aktifkan CLIK_SPCS_EAI, lalu restart notebook.
---    Atau via SQL (ganti <NOTEBOOK_NAME>):
--- ALTER NOTEBOOK <NOTEBOOK_NAME> SET EXTERNAL_ACCESS_INTEGRATIONS = (CLIK_SPCS_EAI);
+-- 4) Attach EAI + SECRET ke Notebook:
+--    Snowsight Notebook -> "..." -> Notebook settings -> External access ->
+--    aktifkan CLIK_SPCS_EAI DAN tambahkan secret CLIK_PD_PAT, lalu restart.
+--    Atau via SQL (ganti <NOTEBOOK_NAME>) - WAJIB set SECRETS juga supaya
+--    st.secrets['CLIK_PD_PAT'] bisa dibaca di dalam notebook:
+-- ALTER NOTEBOOK <NOTEBOOK_NAME>
+--   SET EXTERNAL_ACCESS_INTEGRATIONS = (CLIK_SPCS_EAI)
+--       SECRETS = ('CLIK_PD_PAT' = CLIK_WORKSHOP2.PUBLIC.CLIK_PD_PAT);
+--    Baca di notebook:  import streamlit as st; pat = st.secrets['CLIK_PD_PAT']
 
 -- 5) Cek
 SHOW EXTERNAL ACCESS INTEGRATIONS LIKE 'CLIK_SPCS_EAI';
