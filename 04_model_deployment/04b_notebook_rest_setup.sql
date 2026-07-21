@@ -1,9 +1,11 @@
 /* ============================================================================
    04b - Setup External Access Integration untuk call REST API dari Notebook
    ----------------------------------------------------------------------------
-   Agar Snowflake Notebook (Container Runtime) bisa memanggil endpoint HTTPS
-   publik (SPCS ingress) via REST, container butuh External Access Integration:
-   network rule (egress) + secret (PAT).
+   Agar Snowflake Notebook bisa memanggil endpoint HTTPS publik (SPCS ingress)
+   via REST, container notebook butuh External Access Integration (izin egress).
+
+   Versi HOL: TANPA secret. Tiap peserta mengisi PAT masing-masing langsung di
+   Cell 1 notebook (PAT_TOKEN = "..."). Hanya network rule + EAI yang diperlukan.
    ============================================================================ */
 USE ROLE ACCOUNTADMIN;
 USE DATABASE CLIK_WORKSHOP2;
@@ -16,27 +18,21 @@ CREATE OR REPLACE NETWORK RULE CLIK_SPCS_EGRESS
   TYPE = HOST_PORT
   VALUE_LIST = ('i4ot-sfseapac-ardiyanmuhammad.snowflakecomputing.app');
 
--- 2) Secret: simpan PAT (JANGAN hardcode di kode notebook)
---    Ganti dengan PAT valid milik Anda.
-CREATE OR REPLACE SECRET CLIK_PD_PAT
-  TYPE = GENERIC_STRING
-  SECRET_STRING = '<YOUR_PAT>';
-
--- 3) External Access Integration: gabungkan network rule + secret
+-- 2) External Access Integration (cukup network rule, tanpa secret)
 CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI
   ALLOWED_NETWORK_RULES = (CLIK_SPCS_EGRESS)
-  ALLOWED_AUTHENTICATION_SECRETS = (CLIK_PD_PAT)
   ENABLED = TRUE;
 
--- 4) Attach EAI + SECRET ke Notebook:
---    Snowsight Notebook -> "..." -> Notebook settings -> External access ->
---    aktifkan CLIK_SPCS_EAI DAN tambahkan secret CLIK_PD_PAT, lalu restart.
---    Atau via SQL (ganti <NOTEBOOK_NAME>) - WAJIB set SECRETS juga supaya
---    st.secrets['CLIK_PD_PAT'] bisa dibaca di dalam notebook:
--- ALTER NOTEBOOK <NOTEBOOK_NAME>
---   SET EXTERNAL_ACCESS_INTEGRATIONS = (CLIK_SPCS_EAI)
---       SECRETS = ('CLIK_PD_PAT' = CLIK_WORKSHOP2.PUBLIC.CLIK_PD_PAT);
---    Baca di notebook:  import streamlit as st; pat = st.secrets['CLIK_PD_PAT']
+-- 3) Attach EAI ke Notebook:
+--    Snowsight Notebook -> "..." -> Notebook settings -> External access
+--    integrations -> aktifkan CLIK_SPCS_EAI, lalu restart notebook.
+--    Atau via SQL (ganti <NOTEBOOK_NAME>):
+-- ALTER NOTEBOOK <NOTEBOOK_NAME> SET EXTERNAL_ACCESS_INTEGRATIONS = (CLIK_SPCS_EAI);
+
+-- 4) Di Cell 1 notebook, tiap peserta mengisi PAT sendiri:
+--    PAT_TOKEN = "<PAT masing-masing>"
+--    Buat PAT: Snowsight -> profil -> Settings -> Authentication ->
+--    Programmatic access tokens -> Generate new token.
 
 -- 5) Cek
 SHOW EXTERNAL ACCESS INTEGRATIONS LIKE 'CLIK_SPCS_EAI';
