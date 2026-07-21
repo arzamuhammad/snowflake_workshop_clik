@@ -146,7 +146,7 @@ Cell 6: train an `LGBMClassifier` with balanced class weights.
 Cell 7: compare **AUC, Gini, KS**, plot **ROC curves**, and print the **confusion matrix** + classification report for the best model.
 
 ### Step 1.7 — Register to Model Registry
-Cell 8: register the best pipeline as **`CLIK_PD_MODEL` version `V1`** with metrics and conda dependencies. The full pipeline (preprocess + classifier) is registered so inference accepts **raw feature columns**.
+Cell 8: register the best model as **`CLIK_PD_MODEL` version `V2_SNOWPARK_ML`** (default) with metrics. The model is trained on **one-hot-encoded features** (Snowpark ML), so inference expects the **60 encoded feature columns** (see the `SUBJECT_FEATURES_ENCODED` view below), not raw columns.
 
 ### Step 1.8 — Test inference from the registry
 Cell 9: call `mv.run(..., function_name="predict_proba")` on 10 rows.
@@ -159,8 +159,17 @@ Cell 9: call `mv.run(..., function_name="predict_proba")` on 10 rows.
 
 ## Batch scoring (Warehouse)
 Run **`04_model_deployment/04a_batch_scoring.sql`**:
-- Calls the registered model directly from SQL (`CLIK_PD_MODEL!PREDICT_PROBA`)
-- Writes results into `SCORE_RESULTS` with credit score (300–850) and decision (APPROVE / REVIEW / REJECT)
+- Creates the **`SUBJECT_FEATURES_ENCODED`** view (one-hot encoding of GENDER/EMPLOYMENT_TYPE/EDUCATION/REGION_CODE + derived `DTI_RATIO`) — the 60 model-ready features.
+- Calls the registered model from SQL: `CLIK_PD_MODEL!PREDICT_PROBA(...)` and reads the `PREDICT_PROBA_1` object key (= probability of default).
+- Writes results into `SCORE_RESULTS` with credit score (300–850) and decision (APPROVE / REVIEW / REJECT).
+
+## Feature lookup with Hybrid Tables / Unistore (Step 3 of the architecture)
+Run **`04_model_deployment/04c_hybrid_table_feature_lookup.sql`** to demo the **Precalculated Feature Table** pattern:
+- Creates a **HYBRID TABLE** `SUBJECT_FEATURES_HT` (PK `SUBJECT_ID` + secondary index) — optimized for low-latency **point lookup by primary key** and high concurrency.
+- Compares point lookup vs a standard table: hybrid scans **0 bytes** (row-store/index seek) while a standard table scans ~80–90 MB per lookup.
+- `04_model_deployment/04c_hybrid_table_benchmark.py` measures client latency, TPS, and server-side `bytes_scanned`.
+
+For real-time serving, the encoded features are stored in the hybrid table **`SUBJECT_FEATURES_ENCODED_HT`** (PK `SUBJECT_ID` + 60 encoded features) so the orchestration layer does a fast point lookup before calling the model.
 
 ## Real-time inference (SPCS Model Serving)
 Aligned with the official guide:
@@ -177,7 +186,7 @@ GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE ACCOUNTADMIN;
 ### Step 1b.2 — Deploy the service
 Run **`04_model_deployment/04b_deploy_service.py`** in the notebook:
 ```python
-mv = reg.get_model("CLIK_PD_MODEL").version("V1")
+mv = reg.get_model("CLIK_PD_MODEL").default   # version V2_SNOWPARK_ML
 mv.create_service(
     service_name="CLIK_PD_SERVICE",
     service_compute_pool="CLIK_SCORING_POOL",
@@ -194,25 +203,29 @@ SHOW ENDPOINTS IN SERVICE CLIK_PD_SERVICE;   -- read the ingress_url column
 ```
 or in Python: `mv.list_services()` (`inference_endpoint`).
 
-### Step 1b.4 — Call the REST API
-Edit **`04_model_deployment/04b_call_realtime.py`** (set `INGRESS_URL` and `PAT_TOKEN`), then run it. It builds the payload the recommended way:
-```python
-split_obj = json.loads(df.to_json(orient="split"))
-payload   = {"dataframe_split": split_obj}
-requests.post(f"https://{INGRESS_URL}/predict-proba",
-              headers={"Authorization": f'Snowflake Token="{PAT}"',
-                       "Content-Type": "application/json"},
-              json=payload)
-```
-
-**cURL equivalent:**
+### Step 1b.4 — Call the REST API (from your laptop)
+Set env vars then run **`04_model_deployment/04b_call_realtime.py`** (looks up 60 encoded features from `SUBJECT_FEATURES_ENCODED`, POSTs to the endpoint, reads `PREDICT_PROBA_1`):
 ```bash
-curl -X POST "https://<ingress_url>/predict-proba" \
-  -H 'Authorization: Snowflake Token="<PAT>"' \
-  -H 'Content-Type: application/json' \
-  -d '{"dataframe_split": {"index":[0], "columns":["AGE","MONTHLY_INCOME","..."], "data":[[35,15000000,"..."]]}}'
+export SNOWFLAKE_CONNECTION_NAME=<conn>
+export CLIK_INGRESS_URL="<ingress_url>"
+export CLIK_PAT="<YOUR_PAT>"
+python 04b_call_realtime.py SUBJ000000020 SUBJ000000044
 ```
-> Note: any auth failure or wrong URL returns **HTTP 404** (by design). Use `dataframe_split` (recommended over `dataframe_records`).
+- **`04b_call_realtime_hybrid.py`** — same, but feature lookup is a **point lookup to the Hybrid Table** `SUBJECT_FEATURES_ENCODED_HT` (production pattern).
+
+**Key payload rules (verified):**
+- `dataframe_split` **must include the `index` key** → use `df.to_json(orient="split")` (NOT `index=False`, which returns HTTP 400 "missing required fields").
+- Output shape is `{"data": [[<idx>, {..., "PREDICT_PROBA_1": <PD>}]]}`.
+- Auth/URL failures return **HTTP 404** by design.
+
+### Step 1b.5 — Call the REST API from INSIDE a Snowflake Notebook (showcase)
+To call the endpoint from a notebook, the container needs an **External Access Integration**.
+1. Run **`04_model_deployment/04b_notebook_rest_setup.sql`** (edit the host + PAT): creates `NETWORK RULE CLIK_SPCS_EGRESS`, `SECRET CLIK_PD_PAT`, and `EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI`.
+2. Open **`04_model_deployment/04b_realtime_hybrid_rest.ipynb`** in Snowsight.
+3. Attach the EAI: notebook `⋯` → **Notebook settings** → **External access integrations** → enable `CLIK_SPCS_EAI` → restart.
+4. Run the cells: **Hybrid Table point lookup → REST call (`requests`) → decision**. The PAT is read from the secret via `_snowflake.get_generic_secret_string("CLIK_PD_PAT")` — never hardcoded.
+
+> No-PAT alternative: **`04b_call_realtime_notebook.py`** calls the model with the internal SQL service function `CLIK_PD_SERVICE!PREDICT_PROBA(...)` (no External Access Integration needed).
 
 ---
 
@@ -277,7 +290,11 @@ workshop_clik/
 ├── 01_data_generation/       generate_data.py, data/*.csv
 ├── 02_data_load/             01_create_tables.sql, 02_generate_subject_features.sql, 03_load_from_git.sql
 ├── 03_ml_notebook/           01_end_to_end_ml_pd.ipynb
-├── 04_model_deployment/      04a_batch_scoring.sql, 04b_realtime_spcs.sql, 04b_deploy_service.py, 04b_call_realtime.py
+├── 04_model_deployment/      04a_batch_scoring.sql, 04b_realtime_spcs.sql, 04b_deploy_service.py,
+│                             04b_call_realtime.py, 04b_call_realtime_hybrid.py,
+│                             04b_call_realtime_notebook.py, 04b_call_realtime_notebook_rest.py,
+│                             04b_notebook_rest_setup.sql, 04b_realtime_hybrid_rest.ipynb,
+│                             04c_hybrid_table_feature_lookup.sql, 04c_hybrid_table_benchmark.py
 ├── 05_streamlit_dashboard/   clik_dashboard.py, environment.yml
 ├── 06_coco_prompting/        prompting_guide.md
 ├── 07_cortex_agent/          01_semantic_view.sql, 02_create_agent.sql, README.md
