@@ -12,8 +12,10 @@ jadi payload HARUS berisi 60 fitur ter-encode (bukan kolom mentah). Di sini kita
 ambil dari view SUBJECT_FEATURES_ENCODED (lihat 04a_batch_scoring.sql) yang di
 produksi bisa diganti point-lookup ke Hybrid Table.
 
-Output service predict_proba: kolom PREDICT_PROBA_0 (P tidak default) &
-PREDICT_PROBA_1 (P default = PD score).
+Format payload: dataframe_split -> WAJIB menyertakan key index/columns/data
+(gunakan df.to_json(orient="split"), JANGAN index=False).
+Output service: {"data": [[<idx>, {..fitur.., PREDICT_PROBA_0, PREDICT_PROBA_1}]]}.
+PREDICT_PROBA_1 = P(default) = PD score.
 
 Prasyarat:
 - Service CLIK_PD_SERVICE sudah READY (lihat 04b_deploy_service.py)
@@ -35,9 +37,9 @@ import requests
 import snowflake.connector
 
 # -- Konfigurasi (via environment variable) --
-CONN_NAME   = os.getenv("SNOWFLAKE_CONNECTION_NAME") or "default"
+CONN_NAME = os.getenv("SNOWFLAKE_CONNECTION_NAME") or "default"
 INGRESS_URL = os.getenv("CLIK_INGRESS_URL", "<unique-id>-<account>.snowflakecomputing.app")
-PAT_TOKEN   = os.getenv("CLIK_PAT", "<YOUR_PAT>")
+PAT_TOKEN = os.getenv("CLIK_PAT", "<YOUR_PAT>")
 
 # Method predict_proba -> URL "/predict-proba" (underscore diganti dash)
 ENDPOINT_URL = f"https://{INGRESS_URL}/predict-proba"
@@ -51,7 +53,7 @@ SUBJECT_IDS = sys.argv[1:] or ["SUBJ000000020", "SUBJ000000044", "SUBJ000000068"
 
 
 def lookup_encoded_features(subject_ids):
-    """Orkestrasi: lookup 60 fitur ter-encode untuk subject_ids (SELECT * EXCLUDE SUBJECT_ID)."""
+    """Orkestrasi: lookup 60 fitur ter-encode untuk subject_ids (SELECT EXCLUDE SUBJECT_ID)."""
     conn = snowflake.connector.connect(
         connection_name=CONN_NAME,
         database="CLIK_WORKSHOP2", schema="PUBLIC", warehouse="GEN2_SMALL",
@@ -72,25 +74,30 @@ def lookup_encoded_features(subject_ids):
         conn.close()
 
 
+def extract_pd(row_out):
+    """row_out = [index, {..fitur.., PREDICT_PROBA_1}] ATAU dict langsung."""
+    obj = row_out[1] if isinstance(row_out, list) else row_out
+    if isinstance(obj, dict):
+        return float(obj["PREDICT_PROBA_1"])
+    return float(row_out[-1])
+
+
 def main():
     df = lookup_encoded_features(SUBJECT_IDS)
     print(f"Fitur ter-lookup: {df.shape[0]} baris x {df.shape[1]} kolom (harus 60)")
 
-    # Payload dataframe_split (rekomendasi docs)
-    split_obj = json.loads(df.to_json(orient="split", index=False))
+    # Payload dataframe_split (WAJIB ada key index) - rekomendasi docs
+    split_obj = json.loads(df.to_json(orient="split"))
     payload = {"dataframe_split": split_obj}
 
     resp = requests.post(ENDPOINT_URL, headers=HEADERS, json=payload, timeout=30)
     print("HTTP Status:", resp.status_code)
-    # Catatan docs: kegagalan auth / URL salah -> 404 (tidak bisa dibedakan).
+    # Catatan docs: auth/URL salah -> 404. Format payload salah -> 400.
     resp.raise_for_status()
     result = resp.json()
 
-    # Output mengikuti struktur dataframe: {"columns": [...], "data": [[...]]}
-    cols = result["columns"]
-    for sid, data_row in zip(SUBJECT_IDS, result["data"]):
-        row = dict(zip(cols, data_row))
-        pd_score = float(row.get("PREDICT_PROBA_1", data_row[-1]))
+    for sid, row_out in zip(SUBJECT_IDS, result["data"]):
+        pd_score = extract_pd(row_out)
         credit_score = 300 + round(550 * (1 - pd_score))
         decision = "APPROVE" if pd_score < 0.10 else ("REVIEW" if pd_score < 0.30 else "REJECT")
         print(f"{sid} | PD={pd_score:.4f} | Credit Score={credit_score} | Decision={decision}")
