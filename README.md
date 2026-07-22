@@ -266,6 +266,21 @@ We build the dashboard with **Streamlit in Snowflake in Workspaces** (runs on a 
    ]
    ```
    > **This fixes `ModuleNotFoundError: No module named 'plotly'`.** Copying only `streamlit_app.py` is not enough — the container installs packages from `pyproject.toml`. After editing it, **rerun** the app (the compute pool reinstalls dependencies).
+
+   **Where do packages come from? (External Access / trial accounts)**
+   - **Managed PyPI repository (default, simplest):** if the account has `ENABLE_PYPI_REPOSITORY_USER_PUBLIC_GRANT = true` (granted to `PUBLIC`), the container resolves `plotly` from Snowflake's internal PyPI mirror — **no External Access Integration needed**. Just declare it in `pyproject.toml` and rerun.
+   - **Custom PyPI EAI (only if the managed repo can't resolve a package):** create an External Access Integration for PyPI egress. **This works on trial accounts** (EAI has no edition restriction; `ACCOUNTADMIN` can create it):
+     ```sql
+     USE ROLE ACCOUNTADMIN;
+     CREATE OR REPLACE NETWORK RULE clik_pypi_rule
+       MODE = EGRESS TYPE = HOST_PORT
+       VALUE_LIST = ('pypi.org','pypi.python.org','pythonhosted.org','files.pythonhosted.org');
+     CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION clik_pypi_eai
+       ALLOWED_NETWORK_RULES = (clik_pypi_rule) ENABLED = TRUE;
+     GRANT USAGE ON INTEGRATION clik_pypi_eai TO ROLE <your_role>;
+     ```
+     Then attach it to the app: **Deploy dialog → Network**, or **app settings → External access**, enable `clik_pypi_eai`, and restart.
+   - **Trial note:** the blocker on trials is usually the **compute pool** (Workspaces run on container runtime), not the EAI — ensure the account has a default compute pool and your role has `USAGE` on it.
 4. Press **Run** (Cmd/Ctrl+Enter) to preview the development app. When ready, click **Deploy** and set database `CLIK_WORKSHOP2`, schema `PUBLIC`, a compute pool, and query warehouse `GEN2_SMALL`.
 5. The dashboard has 5 tabs covering every required component:
    - **Overview** — colorful KPI cards, application **funnel**, channel **donut**
