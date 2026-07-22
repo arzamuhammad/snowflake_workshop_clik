@@ -5,11 +5,13 @@ description = "CLIK Workshop 2 credit risk dashboard (Streamlit in Snowflake, Wo
 requires-python = ">=3.11"
 # Dependencies untuk Streamlit in Snowflake in Workspaces (container runtime).
 # streamlit & snowflake-snowpark-python sudah disediakan runtime, tapi aman
-# dicantumkan. plotly WAJIB ditambahkan (tidak ada secara default).
+# dicantumkan. plotly WAJIB (chart). matplotlib WAJIB untuk pandas Styler
+# .background_gradient() (heatmap cross-tab di dashboard).
 dependencies = [
     "streamlit",
     "snowflake-snowpark-python",
     "plotly",
+    "matplotlib",
     "pandas",
     "numpy",
 ]
