@@ -218,29 +218,56 @@ python 04b_call_realtime.py SUBJ000000020 SUBJ000000044
 - Output shape is `{"data": [[<idx>, {..., "PREDICT_PROBA_1": <PD>}]]}`.
 - Auth/URL failures return **HTTP 404** by design.
 
-### Step 1b.5 — Call the REST API from INSIDE a Snowflake Notebook (HOL showcase)
-To call the endpoint from a notebook, the container needs an **External Access Integration** (egress). For a HOL, each participant pastes **their own PAT** — no shared secret required.
+### Step 1b.5 — Call the REST API from INSIDE a Snowflake Notebook (HOL showcase, no PAT)
+Run the REST call **from inside** a Snowflake Notebook (Container Runtime) using the **OAuth session token** the container already has — **no PAT, no External Access Integration**. This is the robust HOL path (PATs expire; the session token is auto-managed).
 
-1. Run **`04_model_deployment/04b_notebook_rest_setup.sql`** (edit the ingress host): creates `NETWORK RULE CLIK_SPCS_EGRESS` and `EXTERNAL ACCESS INTEGRATION CLIK_SPCS_EAI` (network rule only, no secret).
-2. Open one of the showcase notebooks in Snowsight:
+1. Open one of the showcase notebooks in Snowsight (Container Runtime):
    - **`04_model_deployment/04b_realtime_hybrid_rest.ipynb`** — feature lookup via **Hybrid Table point lookup** (`SUBJECT_FEATURES_ENCODED_HT`).
    - **`04_model_deployment/04b_realtime_view_rest.ipynb`** — feature lookup via **View/standard table** (`SUBJECT_FEATURES_ENCODED`) for comparison.
-3. Attach the EAI: notebook `⋯` → **Notebook settings** → **External access integrations** → enable `CLIK_SPCS_EAI` → restart.
-4. In **Cell 1**, set `PAT_TOKEN = "<your PAT>"` (Snowsight → profile → Settings → Authentication → Programmatic access tokens → Generate).
-5. Run the cells: **feature lookup → REST call (`requests`) → decision**.
+2. Run the cells. **Cell 1** reads the token and calls the **internal** service endpoint:
+   ```python
+   with open("/snowflake/session/token") as f:
+       SF_TOKEN = f.read()
+   dns  = session.sql("DESCRIBE SERVICE CLIK_WORKSHOP2.PUBLIC.CLIK_PD_SERVICE").collect()[0]["dns_name"]
+   port = session.sql("SHOW ENDPOINTS IN SERVICE CLIK_WORKSHOP2.PUBLIC.CLIK_PD_SERVICE").collect()[0]["port"]
+   ENDPOINT_URL = f"http://{dns}:{port}/predict-proba"
+   HEADERS = {"Authorization": f'Snowflake Token="{SF_TOKEN}"', "Content-Type": "application/json"}
+   ```
+3. Flow per cell: **feature lookup → REST call (`requests`) → decision**.
 
-> **Security (HOL):** since the PAT is typed directly in Cell 1, remind participants **not to commit** a notebook containing their PAT (or clear it after the demo).
+> **Keep the service up:** the scoring compute pool auto-suspends when idle, which drops the service (calls return 503 / transient errors). Before the demo, resume and wait until READY:
+> ```sql
+> ALTER COMPUTE POOL CLIK_SCORING_POOL RESUME;
+> SELECT SYSTEM$GET_SERVICE_STATUS('CLIK_WORKSHOP2.PUBLIC.CLIK_PD_SERVICE');  -- wait for READY
+> ```
+> For a long HOL, raise the idle timeout: `ALTER COMPUTE POOL CLIK_SCORING_POOL SET AUTO_SUSPEND_SECS = 7200;`
 
-> **No-PAT alternative:** **`04b_call_realtime_notebook.py`** calls the model with the internal SQL service function `CLIK_PD_SERVICE!PREDICT_PROBA(...)` — no External Access Integration or PAT needed.
+> **Calling from OUTSIDE Snowflake (laptop):** use `04b_call_realtime.py` / `04b_call_realtime_hybrid.py` with a PAT (env `CLIK_PAT`) against the public ingress URL — see Step 1b.4.
+
+> **No-REST alternative:** **`04b_call_realtime_notebook.py`** calls the model with the internal SQL service function `CLIK_PD_SERVICE!PREDICT_PROBA(...)` — no token/URL needed.
 
 ---
 
 # Module 2 — Dashboard: We Write the Code (45 min)
 
-1. In Snowsight go to **Projects → Streamlit → + Streamlit App**.
-2. Set database `CLIK_WORKSHOP2`, schema `PUBLIC`, warehouse `GEN2_SMALL`.
-3. Paste **`05_streamlit_dashboard/clik_dashboard.py`**. Use **`environment.yml`** for packages (plotly, pandas, numpy).
-4. Run. The dashboard has 5 tabs covering every required component:
+We build the dashboard with **Streamlit in Snowflake in Workspaces** (runs on a **compute pool / container runtime**). In this model, Python dependencies are declared in **`pyproject.toml`**, not `environment.yml`.
+
+1. In Snowsight open a **Workspace** → **+ Add new » Streamlit app**. Snowflake creates starter files: `streamlit_app.py`, `pyproject.toml`, `snowflake.yml`, `.streamlit/config.toml`.
+2. Paste the code from **`05_streamlit_dashboard/clik_dashboard.py`** into **`streamlit_app.py`**.
+3. **Add package dependencies** — open **`pyproject.toml`** and add `plotly` (plus pandas/numpy) to the `[project].dependencies` array. Use **`05_streamlit_dashboard/pyproject.toml`** as reference:
+   ```toml
+   [project]
+   dependencies = [
+       "streamlit",
+       "snowflake-snowpark-python",
+       "plotly",
+       "pandas",
+       "numpy",
+   ]
+   ```
+   > **This fixes `ModuleNotFoundError: No module named 'plotly'`.** Copying only `streamlit_app.py` is not enough — the container installs packages from `pyproject.toml`. After editing it, **rerun** the app (the compute pool reinstalls dependencies).
+4. Press **Run** (Cmd/Ctrl+Enter) to preview the development app. When ready, click **Deploy** and set database `CLIK_WORKSHOP2`, schema `PUBLIC`, a compute pool, and query warehouse `GEN2_SMALL`.
+5. The dashboard has 5 tabs covering every required component:
    - **Overview** — colorful KPI cards, application **funnel**, channel **donut**
    - **Time Series** — area & line **time-series** charts with Monthly/Weekly toggle
    - **Heatmap & Cross-Tab** — interactive **cross-tabulation** table + **heatmaps**
@@ -301,7 +328,7 @@ workshop_clik/
 │                             04b_call_realtime_notebook.py, 04b_call_realtime_notebook_rest.py,
 │                             04b_notebook_rest_setup.sql, 04b_realtime_hybrid_rest.ipynb,
 │                             04c_hybrid_table_feature_lookup.sql, 04c_hybrid_table_benchmark.py
-├── 05_streamlit_dashboard/   clik_dashboard.py, environment.yml
+├── 05_streamlit_dashboard/   clik_dashboard.py, pyproject.toml, environment.yml
 ├── 06_coco_prompting/        prompting_guide.md
 ├── 07_cortex_agent/          01_semantic_view.sql, 02_create_agent.sql, README.md
 └── README.md                 (this file)
